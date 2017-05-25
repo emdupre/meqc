@@ -1,9 +1,7 @@
 import os
 import sys
 import os.path
-import re
 from re import split as resplit
-import commands
 from optparse import OptionParser,OptionGroup,SUPPRESS_HELP
 # import ipdb
 
@@ -290,11 +288,11 @@ if __name__ == '__main__':
         setname=prefix+options.label
 
     if not shorthand_dsin and len(datasets)!=len(datasets_in):
-        print "*+ Can't understand dataset specification. Try double quotes around -d argument."
+        print("*+ Can't understand dataset specification. Try double quotes around -d argument.")
         sys.exit()
 
     if len(options.tes.split(','))!=len(datasets):
-        print "*+ Number of TEs and input datasets must be equal and matched in order. Or try double quotes around -d argument."
+        print("*+ Number of TEs and input datasets must be equal and matched in order. Or try double quotes around -d argument.")
         sys.exit()
 
     # Prepare script
@@ -311,22 +309,22 @@ if __name__ == '__main__':
     notfound=0
     for ds_ii in range(len(datasets)):
         if commands.getstatusoutput('3dinfo %s' % (getdsname(ds_ii)))[0]!=0:
-            print "*+ Can't find/load dataset %s !" % (getdsname(ds_ii))
+            print("*+ Can't find/load dataset %s !" % (getdsname(ds_ii)))
             notfound+=1
     if options.anat!='' and commands.getstatusoutput('3dinfo %s' % (options.anat))[0]!=0:
-        print "*+ Can't find/load anatomical dataset %s !" % (options.anat)
+        print("*+ Can't find/load anatomical dataset %s !" % (options.anat))
         notfound+=1
     if notfound!=0:
-        print "++ EXITING. Check dataset names."
+        print("++ EXITING. Check dataset names.")
         sys.exit()
 
     # Check dependencies
     grayweight_ok = 0
     if not options.skip_check:
         dep_check()
-        print "++ Continuing with preprocessing."
+        print("++ Continuing with preprocessing.")
     else:
-        print "*+ Skipping dependency checks."
+        print("*+ Skipping dependency checks.")
         grayweight_ok = 1
 
     # Parse timing arguments
@@ -344,11 +342,11 @@ if __name__ == '__main__':
     # Misc. command parsing
     if options.mni: options.space='MNI_caez_N27+tlrc'
     if options.qwarp and (options.anat=='' or not options.space):
-        print "*+ Can't specify Qwarp nonlinear coregistration without anatomical and SPACE template!"
+        print("*+ Can't specify Qwarp nonlinear coregistration without anatomical and SPACE template!")
         sys.exit()
 
     if not options.mask_mode in ['func','anat','template']:
-        print "*+ Mask mode option '%s' is not recognized!" % options.mask_mode
+        print("*+ Mask mode option '%s' is not recognized!" % options.mask_mode)
         sys.exit()
     if options.mask_mode=='' and options.space:
         options.mask_mode='template'
@@ -371,7 +369,7 @@ if __name__ == '__main__':
         cmdist = 20+sum([dd**2. for dd in deltas])**.5
         cmdif =  max(abs(epicm[0]-anatcm[0]),abs(epicm[1]-anatcm[1]),abs(epicm[2]-anatcm[2]))
         addslabs = abs(int(cmdif/maxvoxsz))+10
-           zeropad_opts=" -I %s -S %s -A %s -P %s -L %s -R %s " % (tuple([addslabs]*6))
+        zeropad_opts=" -I %s -S %s -A %s -P %s -L %s -R %s " % (tuple([addslabs]*6))
     oblique_epi_read = int(os.popen('3dinfo -is_oblique %s' % (getdsname(0))).readlines()[0].strip())
     if oblique_epi_read or oblique_anat_read: 
         oblique_mode = True
@@ -384,7 +382,7 @@ if __name__ == '__main__':
         if options.qwarp: qwfres="-dxyz ${voxsize}"  # See section called "Preparing functional masking for this ME-EPI run"
         alfres="-mast_dxyz ${voxsize}"
     if options.anat=='' and options.mask_mode!='func':
-        print "*+ Can't do anatomical-based functional masking without an anatomical!"
+        print("*+ Can't do anatomical-based functional masking without an anatomical!")
         sys.exit()
     if options.anat and options.space and options.qwarp: valid_qwarp_mode = True
     else: valid_qwarp_mode = False
@@ -545,7 +543,7 @@ if __name__ == '__main__':
             if '/' in options.space:
                 sl.append("ll=\"%s\"; templateloc=${ll%%/*}/" % options.space)
                 options.space=options.space.split('/')[-1]
-              else:
+            else:
                 sl.append("templateloc=${afnibinloc%/*}")
             atnsmprage = "%s_at.nii.gz" % (prefix(nsmprage))
             if not dssuffix(nsmprage).__contains__('nii'): sl.append("3dcalc -float -a %s -expr 'a' -prefix %s.nii.gz" % (nsmprage,prefix(nsmprage)))
@@ -803,9 +801,9 @@ if __name__ == '__main__':
 
     # Write the preproc script and execute it
     ofh = open('_meica_%s.sh' % setname ,'w')
-    print "++ Writing script file: _meica_%s.sh" % (setname)
+    print("++ Writing script file: _meica_%s.sh" % (setname))
     ofh.write("\n".join(headsl + sl)+"\n")
     ofh.close()
     if not options.script_only: 
-        print "++ Executing script file: _meica_%s.sh" % (setname)
+        print("++ Executing script file: _meica_%s.sh" % (setname))
         system('bash _meica_%s.sh' % setname)
