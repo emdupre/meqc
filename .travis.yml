@@ -17,10 +17,7 @@ matrix:
          - MINICONDA_URL="https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh"
 
 before_install:
-- sudo add-apt-repository ppa:joyard-nicolas/ffmpeg -y
 - sudo apt-get -qq update
-- sudo apt-get install ffmpeg tesseract-ocr graphviz
-
 
 - export MINICONDA=$HOME/miniconda
 - export PATH="$MINICONDA/bin:$PATH"
