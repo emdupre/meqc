@@ -1,1 +1,1 @@
-from .meica import (fparse)
+from .meica import (format_inputs, fparse)
