@@ -3,11 +3,9 @@ import sys
 import os.path
 from re import split as resplit
 from optparse import OptionParser,OptionGroup,SUPPRESS_HELP
-# import ipdb
 
-__version__="v3.2 beta1"
 welcome_block="""
-# Multi-Echo ICA, Version %s
+# Multi-Echo ICA
 #
 # Kundu, P., Brenowitz, N.D., Voon, V., Worbe, Y., Vertes, P.E., Inati, S.J.,
 # Saad, Z.S., Bandettini, P.A. & Bullmore, E.T. Integrated strategy for
@@ -19,7 +17,7 @@ welcome_block="""
 # multi-echo EPI. NeuroImage (2011).
 # http://dx.doi.org/10.1016/j.neuroimage.2011.12.028
 #
-# meica.py version %s (c) 2014 Prantik Kundu
+# meica.py (c) 2014 Prantik Kundu
 # PROCEDURE 1 : Preprocess multi-echo datasets and apply multi-echo ICA based
 # on spatial concatenation
 # -Check arguments, input filenames, and filesystem for dependencies
@@ -28,7 +26,7 @@ welcome_block="""
 # -Misc. EPI preprocessing (temporal alignment, smoothing, etc) in appropriate
 # order
 # -Compute PCA and ICA in conjuction with TE-dependence analysis
-""" % (__version__,__version__)
+"""
 
 
 def fparse(fname):
@@ -67,6 +65,51 @@ def fparse(fname):
     return prefix, ftype
 
 
+def format_inputs(inset, label, tes):
+    """
+    Parse input file specification as short- or longhand.
+
+    Given a dataset specification (usually from options.input_ds),
+    parse and create a setname for all output files. Also optionally takes
+    a label to append to all created files.
+
+    Parameters
+    ----------
+    inset : str
+    label : str
+    tes   : str
+
+    Returns
+    -------
+    str: name to be "set" for any output files
+    """
+    try:
+        # Parse shorthand input file specification
+        if '[' in inset:
+            fname     = fparse(inset)[0]
+            prefix    = resplit(r'[\[\],]',fname)[0]
+            echo_nums = resplit(r'[\[\],]',fname)[1:-1]
+            trailing  = resplit(r'[\]+]',fname)[-1]
+            setname   = prefix + ''.join(echo_nums) + trailing + label
+
+        # Parse longhand input file specificiation
+        else:
+            datasets_in = inset.split(',')
+            prefix      = fparse(datasets_in[0])[0]
+            echo_nums   = [str(vv+1) for vv in range(len(tes))]
+            trailing    = ''
+            setname     = prefix + trailing + label
+            assert len(echo_nums) == len(datasets_in)
+
+    except AssertionError:
+            print("*+ Can't understand dataset specification. "         +
+                  "Number of TEs and input datasets must be equal and " +
+                  "matched in order. Try double quotes around -d argument.")
+            return
+
+    return setname
+
+
 # def getdsname(e_ii,prefixonly=False, shorthand_dsin=True):
 #     if shorthand_dsin:
 #         dsname = '%s%s%s%s' % (prefix,datasets[e_ii],trailing,isf)
@@ -84,7 +127,7 @@ parser.add_option('-e',"",
                   dest='tes',
                   help="Echo times in ms. ex: -e 14.5,38.5,62.5  ",default='')
 parser.add_option('-d',"",
-                  dest='dsinputs',
+                  dest='input_ds',
                   help="Input datasets. ex: -d RESTe[123].nii.gz",default='')
 parser.add_option('-a',"",
                   dest='anat',
@@ -257,7 +300,7 @@ if __name__ == '__main__':
     print(welcome_block)
 
     # Parse dataset input names
-    # if options.dsinputs=='' or options.TR==0:
+    # if options.input_ds=='' or options.TR==0:
     #     print("Need at least dataset inputs and TE. Try meica.py -h")
     #     sys.exit()
     # if os.path.abspath(os.path.curdir).__contains__('meica.'):
@@ -265,48 +308,26 @@ if __name__ == '__main__':
     #           "Please leave this directory and rerun.")
     #     sys.exit()
 
-    # Parse shorthand input file specification and TEs
     tes = options.tes.split(',')
-    outprefix=options.prefix
-    if '[' in options.dsinputs:
-        shorthand_dsin = True
-        dsinputs=prefix(options.dsinputs)
-        prefix=resplit(r'[\[\],]',dsinputs)[0]
-        datasets=resplit(r'[\[\],]',dsinputs)[1:-1]
-        trailing=resplit(r'[\]+]',dsinputs)[-1]
-        isf= dssuffix(options.dsinputs)
-        setname=prefix+''.join(datasets)+trailing+options.label
-    else:
-        # Parse longhand input file specificiation
-        shorthand_dsin = False
-        datasets_in = options.dsinputs.split(',')
-        datasets = [str(vv+1) for vv in range(len(tes))]
-        prefix = prefix(datasets_in[0])
-        isf = dssuffix(datasets_in[0])
-        if '.nii' in isf: isf='.nii'
-        trailing=''
-        setname=prefix+options.label
+    setname = format_inputs(options.input_ds,
+                            options.label,
+                            tes)
+    output_prefix = options.prefix
 
-    if not shorthand_dsin and len(datasets)!=len(datasets_in):
-        print("*+ Can't understand dataset specification. Try double quotes around -d argument.")
-        sys.exit()
-
-    if len(options.tes.split(','))!=len(datasets):
-        print("*+ Number of TEs and input datasets must be equal and matched in order. Or try double quotes around -d argument.")
-        sys.exit()
+# PICK UP HERE ###################################
 
     # Prepare script
-    startdir=rstrip(popen('pwd').readlines()[0])
-    meicadir=os.path.dirname(os.path.abspath(os.path.expanduser(sys.argv[0])))
-    headsl = []  # Header lines and command list
-    sl = []    # Script command list
-    runcmd = " ".join(sys.argv).replace(options.dsinputs,r'"%s"' % options.dsinputs ).replace('"',r'"')
+    startdir = rstrip(popen('pwd').readlines()[0])
+    meicadir = os.path.dirname(os.path.abspath(os.path.expanduser(sys.argv[0])))
+    headsl   = []  # Header lines and command list
+    sl       = []    # Script command list
+    runcmd   = " ".join(sys.argv).replace(options.input_ds,r'"%s"' % options.input_ds ).replace('"',r'"')
     headsl.append('#'+runcmd)
     headsl.append(welcome_block)
-    osf='.nii.gz'  # Using NIFTI outputs
+    osf      = '.nii.gz'  # Using NIFTI outputs
 
     # Check if input files exist
-    notfound=0
+    notfound = 0
     for ds_ii in range(len(datasets)):
         if commands.getstatusoutput('3dinfo %s' % (getdsname(ds_ii)))[0]!=0:
             print("*+ Can't find/load dataset %s !" % (getdsname(ds_ii)))
@@ -568,7 +589,7 @@ if __name__ == '__main__':
                 sl.append("fi")
                 sl.append("if [ ! -e %s/%s ]; then ln -s %s/%s .; fi" % (startdir,nlatnsmprage,startdir,nlatnsmprage))
                 refanat = '%s/%snl.nii.gz' % (startdir,prefix(atnsmprage))
-        
+
         # Set anatomical reference for anatomical-functional co-registration
         if oblique_mode: alnsmprage = "./%s_ob.nii.gz" % (anatprefix)
         else: alnsmprage = "%s/%s" % (startdir,nsmprage)
