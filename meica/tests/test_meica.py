@@ -1,4 +1,4 @@
-from meica import find_CM, format_inset, fparse
+from meica import format_inset, fparse
 
 def test_fparse():
     ('sub.001', '.nii.gz') == fparse('sub.001.nii.gz')
