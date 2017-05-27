@@ -1,7 +1,11 @@
 import os
 import sys
 import os.path
+import glob
+import nibabel as nib
 from re import split as resplit
+import logging
+import subprocess
 from optparse import OptionParser,OptionGroup,SUPPRESS_HELP
 
 welcome_block="""
@@ -65,7 +69,7 @@ def fparse(fname):
     return prefix, ftype
 
 
-def format_inputs(inset, label, tes):
+def format_inset(inset, tes=None, e=1):
     """
     Parse input file specification as short- or longhand.
 
@@ -76,48 +80,91 @@ def format_inputs(inset, label, tes):
     Parameters
     ----------
     inset : str
-    label : str
     tes   : str
+    e     : echo to process, default 1
 
     Returns
     -------
+    str: dataset name
     str: name to be "set" for any output files
     """
     try:
         # Parse shorthand input file specification
         if '[' in inset:
-            fname     = fparse(inset)[0]
-            prefix    = resplit(r'[\[\],]',fname)[0]
-            echo_nums = resplit(r'[\[\],]',fname)[1:-1]
-            trailing  = resplit(r'[\]+]',fname)[-1]
-            setname   = prefix + ''.join(echo_nums) + trailing + label
+            fname, ftype = fparse(inset)
+            if '+' in ftype:  # if AFNI format, call .HEAD file
+                ftype = ftype + '.HEAD'
+            prefix       = resplit(r'[\[\],]',fname)[0]
+            echo_nums    = resplit(r'[\[\],]',fname)[1:-1]
+            trailing     = resplit(r'[\]+]',fname)[-1]
+            dsname       = prefix + echo_nums[e] + trailing + ftype
+            setname      = prefix + ''.join(echo_nums) + trailing
 
         # Parse longhand input file specificiation
         else:
-            datasets_in = inset.split(',')
-            prefix      = fparse(datasets_in[0])[0]
-            echo_nums   = [str(vv+1) for vv in range(len(tes))]
-            trailing    = ''
-            setname     = prefix + trailing + label
+            datasets_in   = inset.split(',')
+            prefix, ftype = fparse(datasets_in[0])
+            echo_nums     = [str(vv+1) for vv in range(len(tes))]
+            trailing      = ''
+            dsname        = datasets_in[e].strip()
+            setname       = prefix + ''.join(echo_nums[1:]) + trailing
             assert len(echo_nums) == len(datasets_in)
 
-    except AssertionError:
-            print("*+ Can't understand dataset specification. "         +
-                  "Number of TEs and input datasets must be equal and " +
+    except AssertionError as err:
+            print("*+ Can't understand dataset specification. "            +
+                  "Number of TEs and input datasets must be equal and "    +
                   "matched in order. Try double quotes around -d argument.")
-            return
+            raise err
 
-    return setname
+    return dsname, setname
 
 
-# def getdsname(e_ii,prefixonly=False, shorthand_dsin=True):
-#     if shorthand_dsin:
-#         dsname = '%s%s%s%s' % (prefix,datasets[e_ii],trailing,isf)
-#     else:
-#         dsname = datasets_in[e_ii]
-#     if prefixonly:
-#         return fparse(dsname)
-#     else: return dsname
+def find_CM(dset):
+    """
+    Finds the center of mass for a dataset with AFNI 3dCM.
+
+    Given a valid filename, calls AFNI's 3dCM to derive a list of floats
+    representing the coordinate at the center of mass for that file.
+
+    Parameters
+    ----------
+    dset : str
+
+    Returns
+    -------
+    list: coordinate at center of mass for the input file
+    """
+    cm = [float(coord) for coord in subprocess.check_output(['3dCM',
+                                                             dset]).split()]
+
+    return cm
+
+def afni_ver_check():
+    """
+    Checks to see the version of 3dNwarpApply.
+
+    Checks to see the version of 3dNwarpApply available in the
+    accessible AFNI distribution.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    boolean: if nwarp is 'old' version
+    """
+    try:
+        nwarp_help = subprocess.check_output(['3dNwarpApply', '-help'])
+    except FileNotFoundError:
+        print('Required AFNI installation not found!')
+        raise FileNotFoundError
+
+    if b'-affter aaa  = *** THIS OPTION IS NO LONGER AVAILABLE' in nwarp_help:
+        old_qwarp = False
+    else: old_qwarp = True
+
+    return old_qwarp
 
 
 # Configure options and help dialog
@@ -296,143 +343,140 @@ parser.add_option_group(runopts)
 
 if __name__ == '__main__':
 
-    # Show a welcome message
-    print(welcome_block)
+    # Parse selected arguments for underspecified and/or conflicting options
+    if options.input_ds is'' or options.tes is '':
+        raise OSError("Need at least dataset inputs and TEs. Try meica.py -h")
 
-    # Parse dataset input names
-    # if options.input_ds=='' or options.TR==0:
-    #     print("Need at least dataset inputs and TE. Try meica.py -h")
-    #     sys.exit()
-    # if os.path.abspath(os.path.curdir).__contains__('meica.'):
-    #     print("*+ You are inside a ME-ICA directory! " +
-    #           "Please leave this directory and rerun.")
-    #     sys.exit()
+    if not options.overwrite and glob.glob('meica.*') is not []:
+        raise OSError("*+ A ME-ICA directory already exists! " +
+                      "Use '--OVERWRITE' flag to overwrite it.")
 
-    tes = options.tes.split(',')
-    setname = format_inputs(options.input_ds,
-                            options.label,
-                            tes)
+    if not os.path.isfile(options.anat) and options.anat is not '':
+        raise OSError("*+ Can't find anatomical dataset %s!" % (options.anat))
+
+    for ds in options.input_ds:
+        if not os.path.isfile(ds):
+            raise OSError("*+ Can't find dataset %s!" % ds)
+
+    if options.qwarp and (options.anat is '' or not options.space):
+        raise OSError("*+ Can't specify Qwarp nonlinear normalization " +
+                      "without both anatomical and SPACE template!")
+
+    if options.mask_mode not in ['func','anat','template']:
+        raise OSError("*+ Mask mode option '%s' is not " +
+                      "recognized!" % options.mask_mode)
+
+    if options.anat is '' and options.mask_mode is not 'func':
+        raise OSError("*+ Can't do anatomical-based functional " +
+                      "masking without an anatomical!")
+
+    # Set current paths, create logfile for use as shell script
+    startdir  = os.getcwd()
+    meicadir  = os.path.dirname(os.path.realpath(__file__))
+    out_ftype = '.nii.gz'  # Set NIFTI as default output filetype
+
+    logging.basicConfig(level=logging.DEBUG, filename="logfile", filemode="a+",
+                        format="%(message)s")
+    logging.info(welcome_block)  # Show a welcome message
+    logging.info('# Selected Options: ' + args)
+
+    # Generate output filenames
+    _dsname, setname = format_inset(options.input_ds,
+                                    options.tes.split(','))
+    if options.label is not '':
+        setname = setname + options.label
+
     output_prefix = options.prefix
 
-# PICK UP HERE ###################################
-
-    # Prepare script
-    startdir = rstrip(popen('pwd').readlines()[0])
-    meicadir = os.path.dirname(os.path.abspath(os.path.expanduser(sys.argv[0])))
-    headsl   = []  # Header lines and command list
-    sl       = []    # Script command list
-    runcmd   = " ".join(sys.argv).replace(options.input_ds,r'"%s"' % options.input_ds ).replace('"',r'"')
-    headsl.append('#'+runcmd)
-    headsl.append(welcome_block)
-    osf      = '.nii.gz'  # Using NIFTI outputs
-
-    # Check if input files exist
-    notfound = 0
-    for ds_ii in range(len(datasets)):
-        if commands.getstatusoutput('3dinfo %s' % (getdsname(ds_ii)))[0]!=0:
-            print("*+ Can't find/load dataset %s !" % (getdsname(ds_ii)))
-            notfound+=1
-    if options.anat!='' and commands.getstatusoutput('3dinfo %s' % (options.anat))[0]!=0:
-        print("*+ Can't find/load anatomical dataset %s !" % (options.anat))
-        notfound+=1
-    if notfound!=0:
-        print("++ EXITING. Check dataset names.")
-        sys.exit()
-
-    # Check dependencies
-    grayweight_ok = 0
-    if not options.skip_check:
-        dep_check()
-        print("++ Continuing with preprocessing.")
-    else:
-        print("*+ Skipping dependency checks.")
-        grayweight_ok = 1
-
     # Parse timing arguments
-    if options.TR!='':tr=float(options.TR)
+    if options.TR is not '': tr = float(options.TR)
     else:
-        tr=float(os.popen('3dinfo -tr %s' % (getdsname(0))).readlines()[0].strip())
-        options.TR=str(tr)
+        img = nib.load(ds)  # Fix that function!
+        tr  = float(img.header.get_slice_duration())
+
     if 'v' in str(options.basetime):
-        basebrik = int(options.basetime.strip('v'))
-    else:
-        timetoclip=0
+        basebrik   = int(options.basetime.strip('v'))
+    elif 's' in str(options.basetime):
         timetoclip = float(options.basetime.strip('s'))
-        basebrik=int(round(timetoclip/tr))
+        basebrik   = int(round(timetoclip/tr))
 
-    # Misc. command parsing
-    if options.mni: options.space='MNI_caez_N27+tlrc'
-    if options.qwarp and (options.anat=='' or not options.space):
-        print("*+ Can't specify Qwarp nonlinear coregistration without anatomical and SPACE template!")
-        sys.exit()
+    # Parse normalization, masking arguments
+    if options.mni: options.space = 'MNI_caez_N27+tlrc'
+    if options.mask_mode  == '' and options.space:
+        options.mask_mode = 'template'
 
-    if not options.mask_mode in ['func','anat','template']:
-        print("*+ Mask mode option '%s' is not recognized!" % options.mask_mode)
-        sys.exit()
-    if options.mask_mode=='' and options.space:
-        options.mask_mode='template'
+    # Parse alignment arguments
+    if options.coreg_mode == 'aea': options.t2salign   = False
+    elif 'lp' in options.coreg_mode : options.t2salign = True
+    align_base         = basebrik
+    align_interp       = 'cubic'
+    align_interp_final = 'wsinc5'
 
-    # Parse alignment options
-    if options.coreg_mode == 'aea': options.t2salign=False
-    elif 'lp' in options.coreg_mode : options.t2salign=True
-    align_base = basebrik
-    align_interp='cubic'
-    align_interp_final='wsinc5'
-    oblique_epi_read = 0
-    oblique_anat_read = 0
-    zeropad_opts = " -I %s -S %s -A %s -P %s -L %s -R %s " % (tuple([1]*6))
-    if options.anat!='':
-        oblique_anat_read = int(os.popen('3dinfo -is_oblique %s' % (options.anat)).readlines()[0].strip())
-        epicm = [float(coord) for coord in os.popen("3dCM %s" % (getdsname(0))).readlines()[0].strip().split()]
-        anatcm = [float(coord) for coord in os.popen("3dCM %s" % (options.anat)).readlines()[0].strip().split()]
-        maxvoxsz = float(os.popen("3dinfo -dk %s" % (getdsname(0))).readlines()[0].strip())
-        deltas = [abs(epicm[0]-anatcm[0]),abs(epicm[1]-anatcm[1]),abs(epicm[2]-anatcm[2])]
-        cmdist = 20+sum([dd**2. for dd in deltas])**.5
-        cmdif =  max(abs(epicm[0]-anatcm[0]),abs(epicm[1]-anatcm[1]),abs(epicm[2]-anatcm[2]))
-        addslabs = abs(int(cmdif/maxvoxsz))+10
-        zeropad_opts=" -I %s -S %s -A %s -P %s -L %s -R %s " % (tuple([addslabs]*6))
-    oblique_epi_read = int(os.popen('3dinfo -is_oblique %s' % (getdsname(0))).readlines()[0].strip())
-    if oblique_epi_read or oblique_anat_read: 
+    if options.anat is not '':
+        dsname, _setname   = format_inset(options.input_ds,
+                                          options.tes(','))
+
+        epi_cm   = find_CM(dsname)
+        anat_cm  = find_CM(options.anat)
+
+        deltas   = [abs(epi_cm[0] - anat_cm[0]),
+                    abs(epi_cm[1] - anat_cm[1]),
+                    abs(epi_cm[2] - anat_cm[2])]
+
+        cm_dist  = 20 + sum([dd**2. for dd in deltas])**.5
+        cm_dif   = max(deltas)
+        maxvoxsz = float(subprocess.check_output(['3dInfo','-dk',dsname]))
+        addslabs          = abs(int(cm_dif/maxvoxsz)) + 10
+        zeropad_opts      = " -I {0} -S {0} -A {0} -P {0} -L {0} -R {0} "
+        zeropad_opts      = zeropad_opts.format(addslabs)
+
+        oblique_anat_read = subprocess.check_output(['3dInfo',
+                                                     '-is_oblique',
+                                                     options.anat])
+
+    oblique_epi_read = subprocess.check_output(['3dInfo','-is_oblique',dsname])
+    if oblique_epi_read or oblique_anat_read:
         oblique_mode = True
-        headsl.append("echo Oblique data detected.")
+        logging.info("echo Oblique data detected.")
     else: oblique_mode = False
+
     if options.fres:
-        if options.qwarp: qwfres="-dxyz %s" % options.fres
+        if options.qwarp: qw_fres = "-dxyz %s" % options.fres
         alfres = "-mast_dxyz %s" % options.fres
+
     else:
-        if options.qwarp: qwfres="-dxyz ${voxsize}"  # See section called "Preparing functional masking for this ME-EPI run"
-        alfres="-mast_dxyz ${voxsize}"
-    if options.anat=='' and options.mask_mode!='func':
-        print("*+ Can't do anatomical-based functional masking without an anatomical!")
-        sys.exit()
-    if options.anat and options.space and options.qwarp: valid_qwarp_mode = True
-    else: valid_qwarp_mode = False
+        if options.qwarp: qw_fres = "-dxyz ${voxsize}"
+        alfres = "-mast_dxyz ${voxsize}"
 
-    # Detect if current AFNI has old 3dNwarpApply
-    if " -affter aaa  = *** THIS OPTION IS NO LONGER AVAILABLE" in commands.getstatusoutput("3dNwarpApply -help")[1]: old_qwarp = False
-    else: old_qwarp = True
-
-    # Detect AFNI direcotry
-    afnidir = os.path.dirname(os.popen('which 3dSkullStrip').readlines()[0])
+    # Detect AFNI version and directory
+    old_nwarp = afni_ver_check()
+    afnidir   = subprocess.check_output(['which',
+                                         '3dSkullStrip']).decode("utf-8")
+    afnidir   = afnidir.strip()
 
     # Prepare script and enter MEICA directory
-    logcomment("Set up script run environment",level=1)
-    headsl.append('set -e')
-    headsl.append('export OMP_NUM_THREADS=%s' % (options.cpus))
-    headsl.append('export MKL_NUM_THREADS=%s' % (options.cpus))
-    headsl.append('export DYLD_FALLBACK_LIBRARY_PATH=%s' % (afnidir))
-    headsl.append('export AFNI_3dDespike_NEW=YES')
+    logging.info("# Set up script run environment")
+    logging.info('set -e')
+    logging.info('export OMP_NUM_THREADS=%s' % (options.cpus))
+    logging.info('export MKL_NUM_THREADS=%s' % (options.cpus))
+    logging.info('export DYLD_FALLBACK_LIBRARY_PATH=%s' % (afnidir))
+    logging.info('export AFNI_3dDespike_NEW=YES')
+
+##############################################
+# PICK UP HERE !
+##############################################
+
     if not options.resume and not options.tedica_only and not options.select_only and not options.export_only:
         if options.overwrite:
-            headsl.append('rm -rf meica.%s' % (setname))
+            logging.info('rm -rf meica.%s' % (setname))
         else:
-            headsl.append("if [[ -e meica.%s ]]; then echo ME-ICA directory exists, exiting; exit; fi" % (setname))
-        headsl.append('mkdir -p meica.%s' % (setname))
+            logging.info("if [[ -e meica.%s ]]; then echo ME-ICA directory exists, exiting; exit; fi" % (setname))
+        logging.info('mkdir -p meica.%s' % (setname))
     if options.resume:
-        headsl.append('if [ ! -e meica.%s/_meica.orig.sh ]; then mv `ls meica.%s/_meica*sh` meica.%s/_meica.orig.sh; fi' % (setname,setname,setname))
-    if not options.tedica_only and not options.select_only: headsl.append("cp _meica_%s.sh meica.%s/" % (setname,setname))
-    headsl.append("cd meica.%s" % setname)
-    thecwd= "%s/meica.%s" % (getcwd(),setname)
+        logging.info('if [ ! -e meica.%s/_meica.orig.sh ]; then mv `ls meica.%s/_meica*sh` meica.%s/_meica.orig.sh; fi' % (setname,setname,setname))
+    if not options.tedica_only and not options.select_only: logging.info("cp _meica_%s.sh meica.%s/" % (setname,setname))
+    logging.info("cd meica.%s" % setname)
+    thecwd= "%s/meica.%s" % (os.getcwd(),setname)
 
     ica_datasets = sorted(datasets)
 
