@@ -1189,7 +1189,7 @@ if __name__ == '__main__':
 
             for P,P_mask in to_export:
                 logging.info("3dNotes -h \'%s\' %s.nii" % (exp[2],P))
-                if options.anat != '' and '_nat' not in P and is not options.space:
+                if options.anat != '' and '_nat' not in P and options.space is False:
                     logging.info("nifti_tool -mod_hdr -mod_field sform_code " +
                                  "2 -mod_field qform_code 2 -infiles %s.nii " +
                                  "-overwrite" % (P))
