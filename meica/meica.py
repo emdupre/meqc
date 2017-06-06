@@ -3,24 +3,13 @@ import sys
 import os.path
 import glob
 import nibabel as nib
+import numpy as np
 from re import split as resplit
 import logging
 import subprocess
-from optparse import OptionParser,OptionGroup,SUPPRESS_HELP
+from optparse import OptionParser, OptionGroup, SUPPRESS_HELP
 
-welcome_block="""
-# Multi-Echo ICA
-#
-# Kundu, P., Brenowitz, N.D., Voon, V., Worbe, Y., Vertes, P.E., Inati, S.J.,
-# Saad, Z.S., Bandettini, P.A. & Bullmore, E.T. Integrated strategy for
-# improving functional connectivity mapping using multiecho fMRI. PNAS (2013).
-# http://dx.doi.org/10.1073/pnas.1301725110
-#
-# Kundu, P., Inati, S.J., Evans, J.W., Luh, W.M. & Bandettini, P.A.
-# Differentiating BOLD and non-BOLD signals in fMRI time series using
-# multi-echo EPI. NeuroImage (2011).
-# http://dx.doi.org/10.1016/j.neuroimage.2011.12.028
-#
+welcome_block = """
 # meica.py (c) 2014 Prantik Kundu
 # PROCEDURE 1 : Preprocess multi-echo datasets and apply multi-echo ICA based
 # on spatial concatenation
@@ -117,6 +106,7 @@ def format_inset(inset, tes=None, e=1):
             raise err
 
     return dsname, setname
+
 
 def check_obliquity(dset):
     """
@@ -449,11 +439,11 @@ if __name__ == '__main__':
 
     if options.fres:
         if options.qwarp: qw_fres = "-dxyz %s" % options.fres
-        alfres = "-mast_dxyz %s" % options.fres
+        al_fres = "-mast_dxyz %s" % options.fres
 
     else:
         if options.qwarp: qw_fres = "-dxyz ${voxsize}"
-        alfres = "-mast_dxyz ${voxsize}"
+        al_fres = "-mast_dxyz ${voxsize}"
 
     # Detect AFNI version and directory
     afnidir   = subprocess.check_output(['which',
@@ -850,7 +840,7 @@ if __name__ == '__main__':
                              "./eBvrmask.nii.gz %s %s" % (setname,
                                                           ns_mprage,
                                                           almaster,
-                                                          alfres))
+                                                          al_fres))
                 if options.t2salign or options.mask_mode!='func':
                     logging.info("3dAllineate -overwrite -final NN -NN "    +
                                  "-float -1Dmatrix_apply %s_wmat.aff12.1D " +
@@ -858,17 +848,17 @@ if __name__ == '__main__':
                                  "t2svm_ss.nii.gz -prefix "                 +
                                  "./t2svm_ss_vr.nii.gz %s %s" % (setname,
                                                                  almaster,
-                                                                 alfres))
+                                                                 al_fres))
                     logging.info("3dAllineate -overwrite -final NN -NN "      +
                                  "-float -1Dmatrix_apply %s_wmat.aff12.1D "   +
                                  "-base eBvrmask.nii.gz -input ocv_uni+orig " +
                                  "-prefix ./ocv_uni_vr.nii.gz "               +
-                                 "%s %s" % (setname, almaster, alfres))
+                                 "%s %s" % (setname, almaster, al_fres))
                     logging.info("3dAllineate -overwrite -final NN -NN "      +
                                  "-float -1Dmatrix_apply %s_wmat.aff12.1D "   +
                                  "-base eBvrmask.nii.gz -input s0v_ss.nii.gz "+
                                  "-prefix ./s0v_ss_vr.nii.gz " +
-                                 "%s %s" % (setname, almaster, alfres))
+                                 "%s %s" % (setname, almaster, al_fres))
             # Fancy functional masking
             if options.anat and options.mask_mode != 'func':
                 if options.space and options.mask_mode == 'template':
@@ -1103,21 +1093,20 @@ if __name__ == '__main__':
                 warp_code = 'nlw'
                 nwarpstring = " -nwarp {0}/{1}_xns2at.aff12.1D '{0}/{2}_WARP.nii.gz'".format(startdir,
                                                                                              anat_prefix,
-                                                                                             prefix(nlat_ns_mprage))
+                                                                                             pfix_ns_mprage + '_at')
                 logging.info("3dNwarpApply -overwrite %s %s %s -source %s " +
-                             "-interp %s -prefix %s_nlw.nii " % (nwarpstring,
-                                                                 export_master,
-                                                                 qwfres,
-                                                                 exp[0],
-                                                                 interp,
-                                                                 exp[1]))
+                             "-interp wsinc5 -prefix " +
+                             "%s_nlw.nii " % (nwarpstring,
+                                              export_master,
+                                              qw_fres,
+                                              exp[0],
+                                              exp[1]))
                 if warp_code not in mask_dict.keys():
-                    logging.info("3dNwarpApply -overwrite %s %s %s -source " +
-                                 "export_mask.nii.gz -interp %s -prefix "    +
+                    logging.info("3dNwarpApply -overwrite %s %s %s -source "  +
+                                 "export_mask.nii.gz -interp wsinc5 -prefix " +
                                  "%s_export_mask.nii " % (nwarpstring,
                                                           export_master,
-                                                          qwfres,
-                                                          interp,
+                                                          qw_fres,
                                                           warp_code))
                     logging.info("nifti_tool -mod_hdr -mod_field sform_code " +
                                  "2 -mod_field qform_code 2 -infiles "        +
@@ -1130,28 +1119,27 @@ if __name__ == '__main__':
             # If there's a template space, allineate result to that space
             elif options.space:
                 warp_code = 'afw'
-                logging.info("3dAllineate -overwrite -final %s -%s -float "  +
-                             "-1Dmatrix_apply %s/%s_xns2at.aff12.1D -input " +
-                             "%s -prefix ./%s_afw.nii %s %s" % (interp,
-                                                                align_interp,
-                                                                startdir,
-                                                                anat_prefix,
-                                                                exp[0],
-                                                                exp[1],
-                                                                export_master,
-                                                                alfres))
+                logging.info("3dAllineate -overwrite -final wsinc5 -%s " +
+                             "-float -1Dmatrix_apply %s/%s_xns2at.aff12.1D " +
+                             "-input %s -prefix ./%s_afw.nii" +
+                             " %s %s" % (align_interp,
+                                         startdir,
+                                         anat_prefix,
+                                         exp[0],
+                                         exp[1],
+                                         export_master,
+                                         al_fres))
                 if warp_code not in mask_dict.keys():
-                    logging.info("3dAllineate -overwrite -final %s -%s " +
+                    logging.info("3dAllineate -overwrite -final wsinc5 -%s " +
                                  "-float -1Dmatrix_apply  "              +
                                  "%s/%s_xns2at.aff12.1D -input  "        +
                                  "export_mask.nii.gz -prefix "           +
-                                 "./%s_export_mask.nii %s %s" % (interp,
-                                                                 align_interp,
+                                 "./%s_export_mask.nii %s %s" % (align_interp,
                                                                  startdir,
                                                                  anat_prefix,
                                                                  warp_code,
                                                                  export_master,
-                                                                 alfres))
+                                                                 al_fres))
                     logging.info("nifti_tool -mod_hdr -mod_field sform_code " +
                                  "2 -mod_field qform_code 2 -infiles "        +
                                  "%s_export_mask.nii -overwrite" % (warp_code))
