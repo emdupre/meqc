@@ -1,6 +1,8 @@
+# Multi-Echo Independent Components Analysis (ME-ICA)
+
 [![Build Status](https://travis-ci.com/emdupre/me-ica.svg?token=DqydGcufv4xDUqpFRaEx&branch=master)](https://travis-ci.com/emdupre/me-ica)
 
-# Dependencies
+## Dependencies
 
 1. AFNI
 2. Python 2.7
@@ -8,17 +10,17 @@
 4. scipy
 
 
-# Installation
+## Installation
 
 Install Python and other dependencies. If you have AFNI installed and on your path, you should already have an up-to-date version of ME-ICA on your path.
 
-# Important Files and Directories
+## Important Files and Directories
 
 - `meica.py` : a master script that performs preprocessing and calls the ICA/TE-dependence analysis script `tedana.py`
 - `meica.libs` : a folder that includes utility functions for TE-dependence analysis for denoising and anatomical-functional co-registration
 - `meica.libs/tedana.py` : performs ICA and TE-dependence calculations
 
-# Usage
+## Usage
 
 fMRI data is called: 		rest_e1.nii.gz, rest_e2.nii.gz, rest_e3.nii.gz, etc. 
 Anatomical is:		mprage.nii.gz
@@ -53,8 +55,22 @@ Click [here](http://wiki.org/group_analysis.html) more info on group analysis.
 
 For a step-by-step guide on how to assess ME-ICA results in more detail, click [here](http://wiki.org/viewing_results.html)
 
-#Some Notes
+## Some Notes
 
 - Make sure your datasets have slice timing information in the header. If not sure, specify a `--tpattern` option to `meica.py`. Check AFNI documentation of [3dTshift](http://afni.nimh.nih.gov/pub/dist/doc/program_help/3dTshift.html) to see slice timing codes.
 - For more info on T2* weighted anatomical-functional coregistration click [here](http://wiki.org/meica_alignp_mepi_anat.html)
 - FWHM smoothing is not recommended. tSNR boost is provided by optimal combination of echoes. For better overlap of 'blobs' across subjects, use non-linear standard space normalization instead with `meica.py ... --qwarp`
+
+## Citations
+
+If you use ME-ICA in publications, please cite:
+
+> Kundu, P., Brenowitz, N.D., Voon, V., Worbe, Y., Vertes, P.E., Inati, S.J.,
+Saad, Z.S., Bandettini, P.A. & Bullmore, E.T. Integrated strategy for
+improving functional connectivity mapping using multiecho fMRI. PNAS (2013).
+http://dx.doi.org/10.1073/pnas.1301725110
+
+> Kundu, P., Inati, S.J., Evans, J.W., Luh, W.M. & Bandettini, P.A.
+Differentiating BOLD and non-BOLD signals in fMRI time series using
+multi-echo EPI. NeuroImage (2011).
+http://dx.doi.org/10.1016/j.neuroimage.2011.12.028
