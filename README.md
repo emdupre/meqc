@@ -1,18 +1,12 @@
-# Multi-Echo Independent Components Analysis (ME-ICA)
+# ME-ICA BIDS-App
+
+A BIDS-App adaption of Prantik Kundu's Multi-Echo Independent Components Analysis (ME-ICA). 
 
 [![Build Status](https://travis-ci.com/emdupre/me-ica.svg?token=DqydGcufv4xDUqpFRaEx&branch=master)](https://travis-ci.com/emdupre/me-ica)
 
-## Dependencies
-
-1. AFNI
-2. Python 2.7
-3. numpy
-4. scipy
-
-
 ## Installation
 
-Install Python and other dependencies. If you have AFNI installed and on your path, you should already have an up-to-date version of ME-ICA on your path.
+TBD. 
 
 ## Important Files and Directories
 
