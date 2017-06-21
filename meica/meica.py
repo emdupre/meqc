@@ -149,7 +149,7 @@ def find_CM(dset):
     return cm
 
 
-def get_options():
+def get_options(_debug=None):
     """
     Parses command line inputs
 
@@ -367,7 +367,8 @@ def get_options():
                          default=False)
     parser.add_argument_group(runopts)
 
-    return parser.parse_args()
+    if _debug is not None: return parser.parse_args(_debug)
+    else: return parser.parse_args()
 
 
 def gen_script(options):
