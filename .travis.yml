@@ -34,14 +34,17 @@ before_install:
 - source activate test-env
 
 install:
-- pip install pytest pytest-cov
+- pip install pytest coveralls pytest-cov
 - pip install -r requirements.txt
 
 before_script:
 - python setup.py install
 
 script:
-- py.test
+- py.test --pyargs meqc --cov-report term-missing --cov=meqc
+
+after_success:
+- coveralls
 
 before_cache:
 # clean unused packages & installed files from conda cache
