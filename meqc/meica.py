@@ -6,7 +6,6 @@ import sys
 import glob
 import re
 import argparse
-import subprocess
 
 import nibabel as nib
 import numpy as np
@@ -98,55 +97,74 @@ def format_inset(inset, tes=None, e=0):
     return dsname, setname
 
 
-def check_obliquity(dset):
+def check_obliquity(fname):
     """
-    Determines if `dset` is oblique
+    Generates obliquity (in degrees) of `fname`
 
     Parameters
     ----------
-    dset : str
-        path to file
+    fname : str
+        path to neuroimage
 
     Returns
     -------
-    bool : whether `dset` is oblique (True)
+    float : angle from plumb (in degrees)
     """
 
-    aff = nib.load(dset).affine
+    # get abbreviated affine matrix (3x3)
+    aff = nib.load(fname).affine[:3,:-1]
 
-    dxtmp = np.sqrt((aff[:3,0]**2).sum())
-    xmax = np.abs(aff[:3,0]).max() / dxtmp
-
-    dytmp = np.sqrt((aff[:3,1]**2).sum())
-    ymax = np.abs(aff[:3,1]).max() / dytmp
-
-    dztmp = np.sqrt((aff[:3,2]**2).sum())
-    zmax = np.abs(aff[:3,2]).max() / dztmp
-
-    fig_merit = np.min([xmax, ymax, zmax])
+    # generate offset (rads) and convert to degrees
+    fig_merit = np.min(np.sqrt((aff**2).sum(axis=0)) / np.abs(aff).max(axis=0))
     ang_merit = (np.arccos(fig_merit) * 180) / np.pi
 
-    return ang_merit != 0.0
+    return ang_merit
 
-def find_CM(dset):
+
+def find_CM(fname):
     """
-    Finds the center of mass for a dataset with AFNI 3dCM.
+    Generates center of mass for `fname`
 
-    Given a valid filename, calls AFNI's 3dCM to derive a list of floats
-    representing the coordinate at the center of mass for that file.
+    Will only use the first volume if a 4D image is supplied
 
     Parameters
     ----------
-    dset : str
+    fname : str
+        path to neuroimage
 
     Returns
     -------
-    list: coordinate at center of mass for the input file
+    float, float, float : x, y, z coordinates of center of mass
     """
-    cm = [float(coord) for coord in subprocess.check_output(['3dCM',
-                                                             dset]).split()]
 
-    return cm
+    im = nib.load(fname)
+    data = im.get_data()
+    if data.ndim > 3: data = data[:,:,:,0]  # use first volume in 4d series
+    data_sum = data.sum()  # to ensure the dataset is non-zero
+
+    # if dataset is not simply zero, then calculate CM in i, j, k values
+    # otherwise, just pick the dead center of the array
+    if data_sum > 0:
+        cm = []  # to hold CMs
+        for n, dim in enumerate(im.shape[:3]):
+            res = np.ones(3,dtype='int')  # create matrix for reshaping
+            res[n] = dim                  # set appropriate dimension to dim
+            cm.append((np.arange(dim).reshape(res) * data).sum()/data_sum)
+    else:
+        cm = 0.5*(np.array(im.shape[:3])-1)
+
+    # for some reason, the affine as read by nibabel is different than AFNI;
+    # specifically, the first two rows are inverted, so we invert them back
+    # (since we're trying to do this as AFNI would)
+    # then, we calculate the orientation, reindex the affine matrix, and
+    # generate the centers of mass from there based on the above calculations
+    affine = im.affine * [[-1],[-1],[1],[1]]             # fix affine
+    orient = np.abs(affine).argsort(axis=0)[-1,:3]       # get orientation
+    affine = affine[orient]                              # reindex affine
+    cx, cy, cz = affine[:,-1] + cm * np.diag(affine)     # calculate centers
+    cx, cy, cz = np.array([cx,cy,cz])[orient.argsort()]  # reorient centers
+
+    return cx, cy, cz
 
 
 def get_options(_debug=None):
@@ -455,9 +473,9 @@ def gen_script(options):
         maxvoxsz = float(max(voxsz))
         addslabs          = abs(int(cm_dif/maxvoxsz)) + 10
         zeropad_opts      = " -I {0} -S {0} -A {0} -P {0} -L {0} -R {0} ".format(addslabs)
-        oblique_anat_read = check_obliquity(options.anat)
+        oblique_anat_read = check_obliquity(options.anat) != 0
 
-    oblique_epi_read = check_obliquity(dsname)
+    oblique_epi_read = check_obliquity(dsname) != 0
     if oblique_epi_read or oblique_anat_read:
         oblique_mode = True
     else: oblique_mode = False
@@ -555,6 +573,8 @@ def gen_script(options):
                                "{}/{}; fi".format(startdir,
                                                   options.anat))
             deobliq_anat = "{}_do.nii.gz".format(anat_prefix)
+        else:
+            deobliq_anat = options.anat
         if not options.no_skullstrip:
             script_list.append("if [ ! -e "                                   +
                                "{}_ns.nii.gz ]; ".format(path_anat_prefix)    +
