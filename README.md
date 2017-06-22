@@ -14,10 +14,10 @@ Here's one example use case:
 
 Where:
 
-`-e 15,30,45`  are the echo times in milliseconds
-`-d 'sub-001_task-rest_echo-[1,2,3]_run-01_meep1.nii.gz'`  are the 4-D multi-echo fMRI datasets. Can supply each dataset individually or with bash shell expansion
-`-a 'sub-001_T1w.nii.gz'`  is an anatomical image with skull
-`-b 12s`  means drop first 12 seconds of data for equilibration
+`-e 15,30,45`  are the echo times in milliseconds  
+`-d 'sub-001_task-rest_echo-[1,2,3]_run-01_meep1.nii.gz'`  are the 4-D multi-echo fMRI datasets. Can supply each dataset individually or with bash shell expansion  
+`-a 'sub-001_T1w.nii.gz'`  is an anatomical image with skull  
+`-b 12s`  means drop first 12 seconds of data for equilibration  
 `--MNI`  warp anatomical to MNI space using AFNI's MNI_caez_N27 (Colin 27) template. 
 
 Additional, optional parameters support situations such as: anatomical with no skull, applying FWHM smoothing, non-linear warping, etc.
