@@ -2,7 +2,7 @@
 
 A BIDS-App adaption of Prantik Kundu's Multi-Echo Independent Components Analysis (ME-ICA). 
 
-[![Build Status](https://travis-ci.com/emdupre/me-ica.svg?token=DqydGcufv4xDUqpFRaEx&branch=master)](https://travis-ci.com/emdupre/me-ica)
+[![Build Status](https://travis-ci.org/emdupre/meqc.svg?branch=master)](https://travis-ci.org/emdupre/meqc) [![Coverage Status](https://coveralls.io/repos/github/emdupre/meqc/badge.svg?branch=master)](https://coveralls.io/github/emdupre/meqc?branch=master)
 
 ## Installation
 
@@ -11,15 +11,10 @@ TBD.
 ## Important Files and Directories
 
 - `meica.py` : a master script that performs preprocessing and calls the ICA/TE-dependence analysis script `tedana.py`
-- `meica.libs` : a folder that includes utility functions for TE-dependence analysis for denoising and anatomical-functional co-registration
-- `meica.libs/tedana.py` : performs ICA and TE-dependence calculations
 
 ## Usage
 
-fMRI data is called: 		rest_e1.nii.gz, rest_e2.nii.gz, rest_e3.nii.gz, etc. 
-Anatomical is:		mprage.nii.gz
-
-meica.py and tedana.py have a number of options which you can view using the -h flag. 
+Supply multi-echo data in BIDS format; e.g., for anatomical: 'sub-001_T1w.nii.gz' and for functional: 'sub-001_task-rest_echo-1_run-01_meep1.nii.gz'.
 
 Here's an example use:
 
@@ -34,9 +29,17 @@ This means:
     --MNI   warp anatomical to MNI space using a built-in high-resolution MNI template. 
 	--prefix sub1_rest   prefix for final functional output datasets, i.e. sub1_rest_....nii.gz
 
-Again, see `meica.py -h` for handling other situations such as: anatomical with no skull, no anatomical at all, applying FWHM smoothing, non-linear warp to standard space, etc.
+meica.py and tedana.py have an additional number of options which you can view using the -h flag. These include situations such as: anatomical with no skull, no anatomical at all, applying FWHM smoothing, non-linear warp to standard space, etc.
 
-Click [here](http://wiki.org/group_analysis.html) more info on group analysis.
+## Procedure
+PROCEDURE 1 : Preprocess multi-echo datasets and apply multi-echo ICA based
+on spatial concatenation
+-Check arguments, input filenames, and filesystem for dependencies
+-Calculation of motion parameters based on images with highest constrast
+-Application of motion correction and coregistration parameters
+-Misc. EPI preprocessing (temporal alignment, smoothing, etc) in appropriate
+order
+-Compute PCA and ICA in conjuction with TE-dependence analysis
 
 ## Output
 
