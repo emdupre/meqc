@@ -9,12 +9,12 @@ extra_setuptools_args = dict(
     tests_require=['pytest'])
 
 setup(
-    name='meica',
+    name='meqc',
     version=__version__,
     description='Multi-echo independent components analysis of fMRI data.',
     maintainer='Prantik Kundu',
     maintainer_email='',
     install_requires=requirements,
-    packages=['meica'],
+    packages=['meqc'],
     license='MIT',
     **extra_setuptools_args)
