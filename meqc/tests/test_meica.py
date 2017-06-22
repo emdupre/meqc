@@ -1,4 +1,5 @@
-from meica.meica import format_inset, fparse, gen_script, get_options
+import os
+from meqc.meica import format_inset, fparse, gen_script, get_options
 
 def test_fparse():
     ('sub.001', '.nii.gz') == fparse('sub.001.nii.gz')
@@ -32,11 +33,12 @@ def test_format_inset():
 #      -24.6354] == find_CM('../resources/sub-001_T1w.nii.gz')
 
 def test_gen_script():
-    fname = 'resources/_meica_sub-001_task-rest_echo-123_run-01_meepi.sh'
-    sel_opts = ['-d', 'resources/sub-001_task-rest_echo-[1,2,3]_run-01_meepi.nii.gz',
+    resdir = os.path.join(os.path.dirname(__file__),'resources')
+    fname = os.path.join(resdir,'_meica_sub-001_task-rest_echo-123_run-01_meepi.sh')
+    sel_opts = ['-d', os.path.join(resdir,'sub-001_task-rest_echo-[1,2,3]_run-01_meepi.nii.gz'),
                 '-e', '14.5,38.5,62.5',
                 '-b', '4v',
-                '-a', 'resources/sub-001_T1w.nii.gz',
+                '-a', os.path.join(resdir,'sub-001_T1w.nii.gz'),
                 '--fres=2', '--MNI', '--qwarp']
 
     opts = get_options(_debug=sel_opts)
