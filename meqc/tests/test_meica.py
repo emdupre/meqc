@@ -1,4 +1,7 @@
+#!/usr/bin/env python
+
 import os
+import os.path as op
 from meqc.meica import format_inset, fparse, gen_script, get_options
 
 def test_fparse():
@@ -33,12 +36,15 @@ def test_format_inset():
 #      -24.6354] == find_CM('../resources/sub-001_T1w.nii.gz')
 
 def test_gen_script():
-    resdir = os.path.join(os.path.dirname(__file__),'resources')
-    fname = os.path.join(resdir,'_meica_sub-001_task-rest_echo-123_run-01_meepi.sh')
-    sel_opts = ['-d', os.path.join(resdir,'sub-001_task-rest_echo-[1,2,3]_run-01_meepi.nii.gz'),
+    os.environ['DYLD_FALLBACK_LIBRARY_PATH'] = '~/abin'
+    resdir = op.join(op.dirname(__file__),'resources')
+    fname = op.join(resdir,
+                    '_meica_sub-001_task-rest_echo-123_run-01_meepi.sh')
+    sel_opts = ['-d', op.join(resdir,
+                              'sub-001_task-rest_echo-[1,2,3]_run-01_meepi.nii.gz'),
                 '-e', '14.5,38.5,62.5',
                 '-b', '4v',
-                '-a', os.path.join(resdir,'sub-001_T1w.nii.gz'),
+                '-a', op.join(resdir,'sub-001_T1w.nii.gz'),
                 '--fres=2', '--MNI', '--qwarp']
 
     opts = get_options(_debug=sel_opts)
