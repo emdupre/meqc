@@ -125,8 +125,9 @@ def check_obliquity(fname):
     # generate offset (rads) and convert to degrees
     fig_merit = np.min(np.sqrt((aff**2).sum(axis=0)) / np.abs(aff).max(axis=0))
     ang_merit = (np.arccos(fig_merit) * 180) / np.pi
+    is_oblique = ang_merit != 0.0
 
-    return ang_merit
+    return is_oblique
 
 
 def find_CM(fname):
@@ -230,7 +231,7 @@ def run(options):
     get_obliquity = pe.Node(util.Function(input_names=['fname'],
                                           output_names=['angmerit'],
                                           function=check_obliquity),
-                     name='get_cm')
+                            name='get_cm')
 
     meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
     meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
