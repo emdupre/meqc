@@ -14,6 +14,44 @@ import argparse
 import nibabel as nib
 import numpy as np
 
+from duecredit import due, BibTeX
+
+
+references_ = [{'entry': BibTeX('@article{kundu2013integrated,'
+                                'title={Integrated strategy for improving '
+                                'functional connectivity mapping using multiecho '
+                                'fMRI},'
+                                'author={Kundu, Prantik and Brenowitz, Noah D '
+                                'and Voon, Valerie and Worbe, Yulia and V{\'e}rtes, '
+                                'Petra E and Inati, Souheil J and Saad, Ziad S and '
+                                'Bandettini, Peter A and Bullmore, Edward T},'
+                                'journal={Proceedings of the National Academy of Sciences},'
+                                'volume={110},'
+                                'number={40},'
+                                'pages={16187--16192},'
+                                'year={2013},'
+                                'publisher={National Acad Sciences}'
+                                '}'),
+                 'tags': ['method'],
+                 },
+                {'entry': BibTeX('@article{kundu2012differentiating,'
+                                 'title={Differentiating BOLD and non-BOLD '
+                                 'signals in fMRI time series using multi-echo '
+                                 'EPI},'
+                                 'author={Kundu, Prantik and Inati, Souheil J '
+                                 'and Evans, Jennifer W and Luh, Wen-Ming and '
+                                 'Bandettini, Peter A},'
+                                 'journal={Neuroimage},'
+                                 'volume={60},'
+                                 'number={3},'
+                                 'pages={1759--1770},'
+                                 'year={2012},'
+                                 'publisher={Elsevier}'
+                                 '}'),
+                 'tags': ['method'],
+                 },
+               ]
+
 
 def fparse(fname):
     """
@@ -178,6 +216,7 @@ def find_CM(fname):
     return cx, cy, cz
 
 
+@due.dcite(references_)
 def run(options):
     # fix!
     out_dir = os.path.join('option', '1')
@@ -233,21 +272,21 @@ def run(options):
                                           function=check_obliquity),
                             name='get_cm')
     if get_obliquity.is_oblique == True:
-        deoblique = pe.Node(afni.Warp(deoblique=True)
+        deoblique = pe.Node(afni.Warp(deoblique=True),
                             name='deoblique')
         merica_wf.connect(upstream, 't1', deoblique, 'in_file')
         warpspeed = pe.Node(afni.Warp(args='-card2oblique -newgrid 1.0'))
     if skull-stripped == False:
-        unifeyes = pe.Node(afni.Unifize()
-                            name='unifeyes')
+        unifeyes = pe.Node(afni.Unifize(),
+                           name='unifeyes')
         if get_obliquity.is_oblique == True:
             merica_wf.connect(deoblique, 'out_file', unifeyes, 'in_file')
         else:
             merica_wf.connect(upstream, 't1', unifeyes, 'in_file')
-        skullstrip = pe.Node(afni.SkullStrip(args='-shrink_fac_bot_lim 0.3 -orig_vol')
-                                name='skullstrip')
-        autobots = pe.Node(afni.Autobox()
-                            name='autobots')
+        skullstrip = pe.Node(afni.SkullStrip(args='-shrink_fac_bot_lim 0.3 -orig_vol'),
+                             name='skullstrip')
+        autobots = pe.Node(afni.Autobox(),
+                           name='autobots')
         merica_wf.connect(skullstrip, 'out_file', autobots, 'in_file')
 
     # Moving on to functional preprocessing, be back later!
