@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+import nipype.pipeline.engine as pe
+import nipype.interfaces.io as nio
+import nipype.interfaces.utility as util
+import nipype.interfaces.afni as afni
+
 import os
 import sys
 import glob
@@ -173,12 +178,62 @@ def find_CM(fname):
 
 
 def run(options):
+    # fix!
+    out_dir = os.path.join('option', '1')
+    err_dir = os.path.join('option', '2')
+    data_dir = os.path.join('option', '3')
+    work_dir = os.path.join('something', 'else')
+
+    # Workflow
+    meica_wf = pe.Workflow('meica_wf')
+    meica_wf.base_dir = work_dir
+
+    inputspec = pe.Node(util.IdentityInterface(fields=options.keys()),
+                        name='inputspec')
+
+    # Node: subject_iterable
+    run_iterable = pe.Node(util.IdentityInterface(fields=['subject_id'],
+                                                   mandatory_inputs=True),
+                            name='run_iterable')
+    run_iterable.iterables = ('run', runs)
+
+    info = dict(mri_files=[['subject_id']])
+
+    # Create a datasource node to get the mri files
+    datasource = pe.Node(nio.DataGrabber(infields=['subject_id'],
+                                         outfields=info.keys()),
+                         name='datasource')
+    datasource.inputs.template = '*'
+    datasource.inputs.base_directory = abspath(data_dir)
+    datasource.inputs.field_template = dict(mri_files='%s/func/*.nii.gz')
+    datasource.inputs.template_args = info
+    datasource.inputs.sort_filelist = True
+    datasource.inputs.ignore_exception = False
+    datasource.inputs.raise_on_empty = True
+    meica_wf.connect(run_iterable, 'subject_id', datasource, 'subject_id')
+
+    # Create a Function node to rename output files
+    getsubs = pe.Node(util.Function(input_names=['subject_id', 'mri_files'],
+                                    output_names=['subs'],
+                                    function=get_subs),
+                      name='getsubs')
+    getsubs.inputs.ignore_exception = False
+    meica_wf.connect(run_iterable, 'subject_id', getsubs, 'subject_id')
+    meica_wf.connect(datasource, 'mri_files', getsubs, 'mri_files')
+
+
 
     get_cm = pe.Node(util.Function(input_names=['fname'],
                                    output_names=['x', 'y', 'z'],
                                    function=find_CM),
                      name='get_cm')
-    meica_wf.connect(subj_iterable, 'subject_id', get_cm, 'fname')
+    get_obliquity = pe.Node(util.Function(input_names=['fname'],
+                                          output_names=['angmerit'],
+                                          function=check_obliquity),
+                     name='get_cm')
+
+    meica_wf.connect(run_iterable, 'subject_id', get_cm, 'fname')
+    meica_wf.connect(run_iterable, 'subject_id', get_cm, 'fname')
 
 
 def get_options(_debug=None):
