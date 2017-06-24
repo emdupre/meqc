@@ -275,7 +275,7 @@ def run(options):
         deoblique = pe.Node(afni.Warp(deoblique=True),
                             name='deoblique')
         merica_wf.connect(upstream, 't1', deoblique, 'in_file')
-
+        warpspeed = pe.Node(afni.Warp(args='-card2oblique -newgrid 1.0'))
     if skull-stripped == False:
         unifeyes = pe.Node(afni.Unifize(),
                            name='unifeyes')
@@ -290,6 +290,14 @@ def run(options):
         merica_wf.connect(skullstrip, 'out_file', autobots, 'in_file')
 
     # Moving on to functional preprocessing, be back later!
+    if despike == True:
+        despike = pe.Node(afni.Despike()
+                            name='despike')
+        if skull-stripped == False:
+            merica_wf.connect(autobots, 'out_file', despike, 'in_file')
+        else:
+            merica_wf.connect(upstream, 't1', despike, 'in_file')
+
 
     meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
     meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
