@@ -186,8 +186,8 @@ def run(options):
     work_dir = os.path.join('something', 'else')
 
     # Workflow
-    meica_wf = pe.Workflow('meica_wf')
-    meica_wf.base_dir = work_dir
+    merica_wf = pe.Workflow('merica_wf')
+    merica_wf.base_dir = work_dir
 
     inputspec = pe.Node(util.IdentityInterface(fields=options.keys()),
                         name='inputspec')
@@ -232,6 +232,25 @@ def run(options):
                                           output_names=['angmerit'],
                                           function=check_obliquity),
                             name='get_cm')
+    if get_obliquity.is_oblique == True:
+        deoblique = pe.Node(afni.Warp(deoblique=True)
+                            name='deoblique')
+        merica_wf.connect(upstream, 't1', deoblique, 'in_file')
+
+    if skull-stripped == False:
+        unifeyes = pe.Node(afni.Unifize()
+                            name='unifeyes')
+        if get_obliquity.is_oblique == True:
+            merica_wf.connect(deoblique, 'out_file', unifeyes, 'in_file')
+        else:
+            merica_wf.connect(upstream, 't1', unifeyes, 'in_file')
+        skullstrip = pe.Node(afni.SkullStrip(args='-shrink_fac_bot_lim 0.3 -orig_vol')
+                                name='skullstrip')
+        autobots = pe.Node(afni.Autobox()
+                            name='autobots')
+        merica_wf.connect(skullstrip, 'out_file', autobots, 'in_file')
+
+    # Moving on to functional preprocessing, be back later!
 
     meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
     meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
