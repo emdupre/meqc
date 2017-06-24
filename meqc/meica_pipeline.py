@@ -192,15 +192,15 @@ def run(options):
                         name='inputspec')
 
     # Node: subject_iterable
-    run_iterable = pe.Node(util.IdentityInterface(fields=['subject_id'],
-                                                   mandatory_inputs=True),
-                            name='run_iterable')
+    run_iterable = pe.Node(util.IdentityInterface(fields=['run'],
+                                                  mandatory_inputs=True),
+                           name='run_iterable')
     run_iterable.iterables = ('run', runs)
 
-    info = dict(mri_files=[['subject_id']])
+    info = dict(mri_files=[['run']])
 
     # Create a datasource node to get the mri files
-    datasource = pe.Node(nio.DataGrabber(infields=['subject_id'],
+    datasource = pe.Node(nio.DataGrabber(infields=['run'],
                                          outfields=info.keys()),
                          name='datasource')
     datasource.inputs.template = '*'
@@ -210,15 +210,15 @@ def run(options):
     datasource.inputs.sort_filelist = True
     datasource.inputs.ignore_exception = False
     datasource.inputs.raise_on_empty = True
-    meica_wf.connect(run_iterable, 'subject_id', datasource, 'subject_id')
+    meica_wf.connect(run_iterable, 'run', datasource, 'run')
 
     # Create a Function node to rename output files
-    getsubs = pe.Node(util.Function(input_names=['subject_id', 'mri_files'],
+    getsubs = pe.Node(util.Function(input_names=['run', 'mri_files'],
                                     output_names=['subs'],
                                     function=get_subs),
                       name='getsubs')
     getsubs.inputs.ignore_exception = False
-    meica_wf.connect(run_iterable, 'subject_id', getsubs, 'subject_id')
+    meica_wf.connect(run_iterable, 'run', getsubs, 'run')
     meica_wf.connect(datasource, 'mri_files', getsubs, 'mri_files')
 
 
@@ -232,8 +232,8 @@ def run(options):
                                           function=check_obliquity),
                      name='get_cm')
 
-    meica_wf.connect(run_iterable, 'subject_id', get_cm, 'fname')
-    meica_wf.connect(run_iterable, 'subject_id', get_cm, 'fname')
+    meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
+    meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
 
 
 def get_options(_debug=None):
