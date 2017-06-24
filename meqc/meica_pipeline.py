@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+import nipype.pipeline.engine as pe
+import nipype.interfaces.io as nio
+import nipype.interfaces.utility as util
+import nipype.interfaces.afni as afni
+
 import os
 import sys
 import glob
@@ -120,8 +125,9 @@ def check_obliquity(fname):
     # generate offset (rads) and convert to degrees
     fig_merit = np.min(np.sqrt((aff**2).sum(axis=0)) / np.abs(aff).max(axis=0))
     ang_merit = (np.arccos(fig_merit) * 180) / np.pi
+    is_oblique = ang_merit != 0.0
 
-    return ang_merit
+    return is_oblique
 
 
 def find_CM(fname):
@@ -173,12 +179,81 @@ def find_CM(fname):
 
 
 def run(options):
+    # fix!
+    out_dir = os.path.join('option', '1')
+    err_dir = os.path.join('option', '2')
+    data_dir = os.path.join('option', '3')
+    work_dir = os.path.join('something', 'else')
+
+    # Workflow
+    merica_wf = pe.Workflow('merica_wf')
+    merica_wf.base_dir = work_dir
+
+    inputspec = pe.Node(util.IdentityInterface(fields=options.keys()),
+                        name='inputspec')
+
+    # Node: subject_iterable
+    run_iterable = pe.Node(util.IdentityInterface(fields=['run'],
+                                                  mandatory_inputs=True),
+                           name='run_iterable')
+    run_iterable.iterables = ('run', runs)
+
+    info = dict(mri_files=[['run']])
+
+    # Create a datasource node to get the mri files
+    datasource = pe.Node(nio.DataGrabber(infields=['run'],
+                                         outfields=info.keys()),
+                         name='datasource')
+    datasource.inputs.template = '*'
+    datasource.inputs.base_directory = abspath(data_dir)
+    datasource.inputs.field_template = dict(mri_files='%s/func/*.nii.gz')
+    datasource.inputs.template_args = info
+    datasource.inputs.sort_filelist = True
+    datasource.inputs.ignore_exception = False
+    datasource.inputs.raise_on_empty = True
+    meica_wf.connect(run_iterable, 'run', datasource, 'run')
+
+    # Create a Function node to rename output files
+    getsubs = pe.Node(util.Function(input_names=['run', 'mri_files'],
+                                    output_names=['subs'],
+                                    function=get_subs),
+                      name='getsubs')
+    getsubs.inputs.ignore_exception = False
+    meica_wf.connect(run_iterable, 'run', getsubs, 'run')
+    meica_wf.connect(datasource, 'mri_files', getsubs, 'mri_files')
+
+
 
     get_cm = pe.Node(util.Function(input_names=['fname'],
                                    output_names=['x', 'y', 'z'],
                                    function=find_CM),
                      name='get_cm')
-    meica_wf.connect(subj_iterable, 'subject_id', get_cm, 'fname')
+    get_obliquity = pe.Node(util.Function(input_names=['fname'],
+                                          output_names=['angmerit'],
+                                          function=check_obliquity),
+                            name='get_cm')
+    if get_obliquity.is_oblique == True:
+        deoblique = pe.Node(afni.Warp(deoblique=True)
+                            name='deoblique')
+        merica_wf.connect(upstream, 't1', deoblique, 'in_file')
+
+    if skull-stripped == False:
+        unifeyes = pe.Node(afni.Unifize()
+                            name='unifeyes')
+        if get_obliquity.is_oblique == True:
+            merica_wf.connect(deoblique, 'out_file', unifeyes, 'in_file')
+        else:
+            merica_wf.connect(upstream, 't1', unifeyes, 'in_file')
+        skullstrip = pe.Node(afni.SkullStrip(args='-shrink_fac_bot_lim 0.3 -orig_vol')
+                                name='skullstrip')
+        autobots = pe.Node(afni.Autobox()
+                            name='autobots')
+        merica_wf.connect(skullstrip, 'out_file', autobots, 'in_file')
+
+    # Moving on to functional preprocessing, be back later!
+
+    meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
+    meica_wf.connect(run_iterable, 'run', get_cm, 'fname')
 
 
 def get_options(_debug=None):
