@@ -14,43 +14,7 @@ import argparse
 import nibabel as nib
 import numpy as np
 
-from duecredit import due, BibTeX
-
-
-references_ = [{'entry': BibTeX('@article{kundu2013integrated,'
-                                'title={Integrated strategy for improving '
-                                'functional connectivity mapping using multiecho '
-                                'fMRI},'
-                                'author={Kundu, Prantik and Brenowitz, Noah D '
-                                'and Voon, Valerie and Worbe, Yulia and V{\'e}rtes, '
-                                'Petra E and Inati, Souheil J and Saad, Ziad S and '
-                                'Bandettini, Peter A and Bullmore, Edward T},'
-                                'journal={Proceedings of the National Academy of Sciences},'
-                                'volume={110},'
-                                'number={40},'
-                                'pages={16187--16192},'
-                                'year={2013},'
-                                'publisher={National Acad Sciences}'
-                                '}'),
-                 'tags': ['method'],
-                 },
-                {'entry': BibTeX('@article{kundu2012differentiating,'
-                                 'title={Differentiating BOLD and non-BOLD '
-                                 'signals in fMRI time series using multi-echo '
-                                 'EPI},'
-                                 'author={Kundu, Prantik and Inati, Souheil J '
-                                 'and Evans, Jennifer W and Luh, Wen-Ming and '
-                                 'Bandettini, Peter A},'
-                                 'journal={Neuroimage},'
-                                 'volume={60},'
-                                 'number={3},'
-                                 'pages={1759--1770},'
-                                 'year={2012},'
-                                 'publisher={Elsevier}'
-                                 '}'),
-                 'tags': ['method'],
-                 },
-               ]
+from duecredit import due, Doi
 
 
 def fparse(fname):
@@ -216,7 +180,10 @@ def find_CM(fname):
     return cx, cy, cz
 
 
-@due.dcite(references_)
+@due.dcite(Doi('10.1016/j.neuroimage.2011.12.028'),
+           description='ME-ICA proof of concept.')
+@due.dcite(Doi('10.1073/pnas.1301725110'),
+           description='ME-ICA test on independent dataset.')
 def run(options):
     # fix!
     out_dir = os.path.join('option', '1')
@@ -291,8 +258,8 @@ def run(options):
 
     # Moving on to functional preprocessing, be back later!
     if despike == True:
-        despike = pe.Node(afni.Despike()
-                            name='despike')
+        despike = pe.Node(afni.Despike(),
+                          name='despike')
         if skull-stripped == False:
             merica_wf.connect(autobots, 'out_file', despike, 'in_file')
         else:
